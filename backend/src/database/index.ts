@@ -4,18 +4,37 @@ import { logger } from '../utils/logger.js';
 
 const { Pool } = pg;
 
+// Helper to ensure direct IPv6 address fallback if Supabase domain is used
+const getSanitizedConnectionString = (): string => {
+  let conn = config.db.connectionString || '';
+  if (conn.includes('db.idqpehhbebggkoofxohe.supabase.co')) {
+    conn = conn.replace('db.idqpehhbebggkoofxohe.supabase.co', '2406:da12:5ca:b702:1acc:bc9c:c18d:6cbd');
+  }
+  return conn;
+};
+
+const getSanitizedHost = (): string => {
+  let host = config.db.host || '2406:da12:5ca:b702:1acc:bc9c:c18d:6cbd';
+  if (host === 'db.idqpehhbebggkoofxohe.supabase.co') {
+    host = '2406:da12:5ca:b702:1acc:bc9c:c18d:6cbd';
+  }
+  return host;
+};
+
+const connectionString = getSanitizedConnectionString();
+
 // Initialize PostgreSQL Pool
 export const dbPool = new Pool(
-  config.db.connectionString
+  connectionString
     ? {
-        connectionString: config.db.connectionString,
+        connectionString,
         ssl: config.db.ssl ? { rejectUnauthorized: false } : false,
         max: config.db.maxPoolSize,
         idleTimeoutMillis: config.db.idleTimeoutMillis,
         connectionTimeoutMillis: config.db.connectionTimeoutMillis,
       }
     : {
-        host: config.db.host,
+        host: getSanitizedHost(),
         port: config.db.port,
         database: config.db.name,
         user: config.db.user,
