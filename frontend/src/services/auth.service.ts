@@ -15,4 +15,9 @@ export const authService = {
     const { data } = await apiClient.get<ApiResponse<UserSummary[]>>('/auth/users');
     return data.data;
   },
+
+  async createUser(payload: any): Promise<any> {
+    const { data } = await apiClient.post<ApiResponse<any>>('/auth/users', payload);
+    return data.data;
+  },
 };

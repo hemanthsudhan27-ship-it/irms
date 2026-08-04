@@ -1,16 +1,19 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserRepository } from '../repositories/user.repository.js';
+import { RoleRepository } from '../repositories/role.repository.js';
 import { config } from '../config/index.js';
 import { ILoginResponse, IJwtPayload } from '../interfaces/auth.interface.js';
 import { IUserResponse } from '../interfaces/user.interface.js';
-import { UnauthorizedError, NotFoundError } from '../errors/app-error.js';
+import { UnauthorizedError, NotFoundError, ConflictError } from '../errors/app-error.js';
 
 export class AuthService {
   private userRepository: UserRepository;
+  private roleRepository: RoleRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
+    this.roleRepository = new RoleRepository();
   }
 
   private generateAccessToken(payload: IJwtPayload): string {
@@ -143,5 +146,41 @@ export class AuthService {
       roleSlug: u.role_slug,
       complexId: u.complex_id,
     }));
+  }
+
+  public async createUser(data: {
+    fullName: string;
+    email: string;
+    phone?: string | null;
+    password?: string;
+    roleSlug: string;
+    companyId?: string | null;
+    complexId?: string | null;
+  }): Promise<IUserResponse> {
+    const existing = await this.userRepository.findByEmail(data.email);
+    if (existing) {
+      throw new ConflictError(`User with email '${data.email}' already exists`);
+    }
+
+    const role = await this.roleRepository.findBySlug(data.roleSlug);
+    if (!role) {
+      throw new NotFoundError(`Role '${data.roleSlug}' not found`);
+    }
+
+    const passwordHash = await bcrypt.hash(data.password || 'Temp@123#', 10);
+
+    const newUser = await this.userRepository.create({
+      full_name: data.fullName,
+      email: data.email,
+      phone: data.phone || null,
+      password_hash: passwordHash,
+      role_id: role.id,
+      company_id: data.companyId || null,
+      complex_id: data.complexId || null,
+      status: 'active',
+    });
+
+    const userWithDetails = await this.userRepository.findById(newUser.id);
+    return this.toUserResponse(userWithDetails!);
   }
 }

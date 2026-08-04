@@ -12,5 +12,6 @@ router.post('/logout', authController.logout);
 
 router.get('/me', authenticate, authController.me);
 router.get('/users', authenticate, authorizeRoles('super_admin'), authController.getUsers);
+router.post('/users', authenticate, authorizeRoles('super_admin'), authController.createUser);
 
 export default router;

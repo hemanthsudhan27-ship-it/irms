@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
-import { loginSchema } from '../validators/auth.validator.js';
+import { loginSchema, createUserSchema } from '../validators/auth.validator.js';
 import { ValidationError } from '../errors/app-error.js';
 import { IAuthenticatedRequest } from '../interfaces/auth.interface.js';
 
@@ -73,6 +73,21 @@ export class AuthController {
     res.status(200).json({
       success: true,
       message: 'Logged out successfully',
+    });
+  });
+
+  public createUser = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const parseResult = createUserSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new ValidationError('Validation failed', parseResult.error.flatten().fieldErrors);
+    }
+
+    const newUser = await this.authService.createUser(parseResult.data);
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: newUser,
     });
   });
 }

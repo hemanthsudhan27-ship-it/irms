@@ -58,6 +58,14 @@ export default function ComplexesPage() {
   });
 
   const [selectedAdminId, setSelectedAdminId] = useState('');
+  const [adminTab, setAdminTab] = useState<'existing' | 'new'>('existing');
+  const [newAdminForm, setNewAdminForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    phone: '',
+  });
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   // Move-In Resident Form
   const [residentForm, setResidentForm] = useState({
@@ -141,6 +149,50 @@ export default function ComplexesPage() {
       toast.error(err.response?.data?.message || 'Failed to assign admin');
     },
   });
+
+  const handleAssignAdminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminTab === 'existing') {
+      if (!selectedAdminId) {
+        toast.error('Please select an administrator user');
+        return;
+      }
+      assignAdminMutation.mutate({
+        complexId: assigningComplex!.id,
+        adminUserId: selectedAdminId,
+      });
+    } else {
+      if (!newAdminForm.fullName || !newAdminForm.email || !newAdminForm.password) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+      setIsCreatingAdmin(true);
+      try {
+        const createdUser = await authService.createUser({
+          fullName: newAdminForm.fullName,
+          email: newAdminForm.email,
+          password: newAdminForm.password,
+          phone: newAdminForm.phone || null,
+          roleSlug: 'complex_admin',
+          companyId: assigningComplex!.companyId,
+        });
+
+        queryClient.invalidateQueries({ queryKey: ['systemUsers'] });
+
+        await assignAdminMutation.mutateAsync({
+          complexId: assigningComplex!.id,
+          adminUserId: createdUser.id,
+        });
+
+        setNewAdminForm({ fullName: '', email: '', password: '', phone: '' });
+        setAdminTab('existing');
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || 'Failed to create and assign administrator');
+      } finally {
+        setIsCreatingAdmin(false);
+      }
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => complexService.delete(id),
@@ -303,10 +355,11 @@ export default function ComplexesPage() {
                         onClick={() => {
                           setAssigningComplex(comp);
                           setSelectedAdminId(comp.assignedAdmin?.id || '');
+                          setAdminTab('existing');
                         }}
                         className="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-semibold transition-colors cursor-pointer"
                       >
-                        Assign Admin
+                        {comp.assignedAdmin ? 'Edit Admin' : 'Assign Admin'}
                       </button>
                     )}
                   </div>
@@ -721,60 +774,131 @@ export default function ComplexesPage() {
         {/* Assign Complex Admin Modal */}
         {assigningComplex && (
           <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-              <h2 className="text-base font-bold text-slate-100">
-                Assign Complex Admin
-              </h2>
-              <p className="text-xs text-slate-400">
-                Assign an administrator account to manage <span className="font-semibold text-slate-200">{assigningComplex.name}</span>.
-              </p>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-100">
+                  {assigningComplex.assignedAdmin ? 'Modify Complex Admin' : 'Assign Complex Admin'}
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Manage the administrator account for <span className="font-semibold text-slate-200">{assigningComplex.name}</span>.
+                </p>
+              </div>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!selectedAdminId) {
-                    toast.error('Please select an administrator user');
-                    return;
-                  }
-                  assignAdminMutation.mutate({
-                    complexId: assigningComplex.id,
-                    adminUserId: selectedAdminId,
-                  });
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Select Administrator *</label>
-                  <select
-                    required
-                    value={selectedAdminId}
-                    onChange={(e) => setSelectedAdminId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select User...</option>
-                    {systemUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.fullName} ({u.email}) - [{u.roleName}]
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Tab Selector */}
+              <div className="flex border-b border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('existing')}
+                  className={`flex-1 py-2 text-xs font-semibold border-b-2 transition-all ${
+                    adminTab === 'existing'
+                      ? 'border-white text-white'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Choose Existing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('new')}
+                  className={`flex-1 py-2 text-xs font-semibold border-b-2 transition-all ${
+                    adminTab === 'new'
+                      ? 'border-white text-white'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Create & Assign New
+                </button>
+              </div>
+
+              <form onSubmit={handleAssignAdminSubmit} className="space-y-4">
+                {adminTab === 'existing' ? (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Select Administrator *</label>
+                    <select
+                      required
+                      value={selectedAdminId}
+                      onChange={(e) => setSelectedAdminId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-700"
+                    >
+                      <option value="">Select User...</option>
+                      {systemUsers
+                        .filter((u: any) => u.roleSlug === 'complex_admin')
+                        .map((u: any) => (
+                          <option key={u.id} value={u.id}>
+                            {u.fullName} ({u.email})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAdminForm.fullName}
+                        onChange={(e) => setNewAdminForm({ ...newAdminForm, fullName: e.target.value })}
+                        placeholder="e.g. Sarah Connor"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Email Address *</label>
+                      <input
+                        type="email"
+                        required
+                        value={newAdminForm.email}
+                        onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value })}
+                        placeholder="sarah@example.com"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-700"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Password *</label>
+                        <input
+                          type="password"
+                          required
+                          value={newAdminForm.password}
+                          onChange={(e) => setNewAdminForm({ ...newAdminForm, password: e.target.value })}
+                          placeholder="••••••••"
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Phone Number</label>
+                        <input
+                          type="text"
+                          value={newAdminForm.phone}
+                          onChange={(e) => setNewAdminForm({ ...newAdminForm, phone: e.target.value })}
+                          placeholder="+1 555-0100"
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
                   <button
                     type="button"
-                    onClick={() => setAssigningComplex(null)}
+                    onClick={() => {
+                      setAssigningComplex(null);
+                      setNewAdminForm({ fullName: '', email: '', password: '', phone: '' });
+                      setAdminTab('existing');
+                    }}
                     className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-lg"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={assignAdminMutation.isPending}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                    disabled={assignAdminMutation.isPending || isCreatingAdmin}
+                    className="px-4 py-2 bg-white text-black text-xs font-semibold rounded-lg flex items-center gap-1.5"
                   >
-                    {assignAdminMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    Assign Admin
+                    {(assignAdminMutation.isPending || isCreatingAdmin) && <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />}
+                    {adminTab === 'existing' ? 'Assign Admin' : 'Create & Assign'}
                   </button>
                 </div>
               </form>

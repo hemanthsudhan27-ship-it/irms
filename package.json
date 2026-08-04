@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "dev": "node scripts/dev.js",
     "dev:backend": "pnpm --filter @irms/backend dev",
     "dev:frontend": "pnpm --filter @irms/frontend dev",
     "build:backend": "pnpm --filter @irms/backend build",

@@ -28,14 +28,14 @@ export default function TopNav() {
           className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded-lg transition-colors relative cursor-pointer"
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan-500" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-white" />
         </button>
 
         <div className="h-5 w-[1px] bg-slate-800" />
 
         {/* User Profile Dropdown */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold">
+          <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white text-xs font-bold">
             {user?.fullName?.charAt(0) || 'U'}
           </div>
           <div className="hidden md:block text-left">
